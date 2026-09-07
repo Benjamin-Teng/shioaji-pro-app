@@ -26,7 +26,7 @@
 
 ### 驗證範圍與安全限制
 
-- 已在既有 Apple Silicon Mac 上實測 Codex、Claude Code、Pi 的設定／原生登入、連線測試、首次對話及唯讀 App 查詢；Pi 本次使用 OpenAI（ChatGPT Plus／Pro）服務。
+- 已在既有 Apple Silicon Mac 上實測三個 runtime 的設定、連線測試、首次對話及唯讀 App 查詢；Codex 沿用既有原生登入，Claude Code／Pi 完成瀏覽器授權。Pi 本次使用 OpenAI（ChatGPT Plus／Pro）服務。
 - **Windows 原生操作與乾淨機器驗收尚未完成，預計發佈後進行。** 既有 Mac 的通過結果不代表所有平台、全新帳戶或所有 Pi 服務均已驗證。
 - 首次引導不會放寬一般 Agent 的交易安全限制；Agent 交易仍限已驗證的模擬環境，正式環境 Agent 下單維持停用。
 

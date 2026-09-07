@@ -1,50 +1,34 @@
-## v0.1.45 - 原生 AI Agent 工作區、技能與交易安全邊界
+## v0.1.46 - AI 助理引導設定、原生內容建立與回測結果查詢
 
-### Codex、Claude Code、Pi Agent 原生接入
+### 在 App 內完成 AI 助理設定
 
-Shioaji Pro 的 AI Agent 不再只是包一層聊天 API。桌面版現在可直接使用 Codex、Claude Code 與 Pi Agent 的原生 runtime，保留各自的登入、模型、推理與工具能力，並由 App 統一提供交易工作區與安全邊界。
+- Codex、Claude Code、Pi Agent 新增受管理設定流程，串接 runtime 安裝、原生登入、官方技能整合、模型選擇與連線測試。
+- Pi 可選擇模型服務，依服務支援使用原生 OAuth 或 API Key 登入；模型清單由原生 runtime 提供。
+- 連線測試會確認實際模型回應與唯讀 App 查詢；安裝、登入及測試狀態分開呈現，失敗後可重試，不必一律重裝。
 
-- Provider-neutral App Tools：行情、帳戶、版面、技能與交易語意使用同一份版本化契約。
-- Agent 對話支援 session 保存、resume／fork、工具執行紀錄、技能選單與背景任務。
-- 官方 Shioaji Pro skill／plugin 可安裝到 Codex 與 Claude Code；Pi 使用對應的 native policy。
-- Codex 訂閱模型改由 native app-server 的 `model/list` 動態載入，不再受 App 內建清單限制；GPT-5.6 系列與之後新增的帳號可用模型會自動出現（#20）。
+### 還沒有 Shioaji API Key，也能先取得引導
 
-![AI Agent 原生 runtime 與交易權限設定](https://raw.githubusercontent.com/Sinotrade/shioaji-pro-app/v0.1.45/docs/images/release-0.1.45-agent-settings.png)
+- 首次設定畫面的 AI 助理可提供文字引導並讀取目前 App 狀態，不需要先啟動交易伺服器；此流程不開放 shell、檔案操作或交易工具。
+- 引導對話獨立保存，不會載入既有交易對話、工作區文件或個人常駐指示；原有 Anthropic／OpenAI API 對話選項保留。
+- 完成對話後切回設定會回收閒置 runtime，避免模型清單被閒置程序卡住；執行中的任務不會因此被停止。
 
-### 交易核准是人看得懂的介面
+### 原生指標、策略與唯讀回測結果
 
-手動下單確認與 Agent 下單核准已拆成兩套互不混用的控制：
+- 修正原生 Agent 與官方技能的內容建立指引：建立指標或策略時使用 App 原生格式與儲存工具，並依驗證結果修正內容。
+- Agent 可讀取 App 最新回測的狀態、參數、成本假設與績效摘要，並分頁查看逐商品結果及交易明細，減少大量資料佔滿對話。
+- 本次回測工具僅讀取目前記憶體快照，不會啟動回測，也不是可保存、重現的研究紀錄；多商品批次回測仍是各商品獨立測試，不等於投資組合回測。
 
-- 手動操作使用原有的可視化委託確認，可在風控設定中控制。
-- Agent 提案以方向、商品、價格、數量、帳戶與環境為第一層資訊；完整 payload 與 digest 收在技術細節。
-- 核准視窗由 Tauri native 建立，主 WebView 與模型不能自行偽造「已確認」。關窗、逾時或環境不明一律拒絕。
-- 模糊的網路／券商結果不會自動重送；App 保留待核對紀錄，讓使用者確認券商端結果後再決定是否可用同一 idempotency key 重試。
+### 啟動與恢復修正
 
-### Phase 1 安全界線
+- 改善 Windows Codex 執行入口偵測、無效設定狀態恢復，以及原生程序退出時的對話恢復處理。
+- 修正 Windows 稽核檔案替換與原生測試啟動相容性，補強跨平台回歸測試。
+- 修正 Claude App 工具完成後仍出現重複「執行中」項目的顯示問題。
 
-- Agent 交易目前只在已驗證的**模擬環境**提供；受限的模擬自動模式仍通過數量、價格、頻率與帳戶風控。
-- 正式環境 Agent mutation 維持 fail-closed；人類在交易終端內原有的正式下單不受影響。
-- 正式環境逐筆 Agent 核准將在 Shioaji server 支援 one-shot／native IPC secret bootstrap 後開放；正式環境不會提供免確認的全自動權限。
+### 驗證範圍與安全限制
 
-這個界線避免同一使用者下執行的 provider process 取得 sidecar reusable signing secret 後繞過逐筆核准。它是刻意的安全限制，不是 UI 少接一個按鈕。
-
-### 稽核、冪等與程序隔離
-
-- capability secret 隨 sidecar generation 輪替；server restart、runtime stop／exit 會撤銷權限。
-- mutation 在外部副作用前持久化 intent，並按環境、帳戶、工具與 idempotency key 隔離。
-- keyed audit chain 使用分段輪替與 checkpoint；啟動或人工驗證會做完整檢查，日常 append 維持固定成本。
-- Codex／Claude／Pi process tree 在 macOS／Linux 以 process group、Windows 以 Job Object 管理；停止 runtime 會清理 descendants、pending calls 與短期憑證。
-- Linux、Windows exact-head composite CI 已涵蓋 frontend、Rust、plugin、Pi policy、Windows TCP owner 與 Job Object E2E。
-
-### 開發與發佈治理
-
-- public／private repo 使用不可變 SHA pin；private 先 merge，public repin 並重跑跨平台 composite 後才能 merge 或打 tag。
-- Release build 會再次驗證 `DESKTOP_MODULES_REF` 等於 private `main`，不一致直接停止。
-
-### 相容性
-
-- 內建 Shioaji Server `v1.7.4`；既有手動交易、行情與版面功能不受 Agent Harness 權限影響。
-- 深色、純黑與淺色主題完整支援。
+- 已在既有 Apple Silicon Mac 上實測三個 runtime 的設定、連線測試、首次對話及唯讀 App 查詢；Codex 沿用既有原生登入，Claude Code／Pi 完成瀏覽器授權。Pi 本次使用 OpenAI（ChatGPT Plus／Pro）服務。
+- **Windows 原生操作與乾淨機器驗收尚未完成，預計發佈後進行。** 既有 Mac 的通過結果不代表所有平台、全新帳戶或所有 Pi 服務均已驗證。
+- 首次引導不會放寬一般 Agent 的交易安全限制；Agent 交易仍限已驗證的模擬環境，正式環境 Agent 下單維持停用。
 
 ---
 

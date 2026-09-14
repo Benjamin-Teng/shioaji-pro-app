@@ -13,8 +13,9 @@
 - public 已合併：#79 首頁旗標／主題／文件；#81（含 #77）1.7.5、用量監控、
   正式 Harness、圖表指標與 dev identity；#82 設定 UX；#83 重啟前停止 native Agent；
   #84 CI 觸發／取消修正。
-- 本次候選待合併：#103 帳務／行情查詢用量及快照一檔；#108 從中拆出的熱圖冷開／
-  模擬昨餘顯示修正。#102 保護單另案，不列為已修復；#57 長時間共存根因仍未證實。
+- 本次已合併：#108 熱圖冷開／模擬昨餘顯示修正，merge commit
+  `2d09d9bccb2f047792814bf8ee09520bbd42f775`，其四項 CI 均 SUCCESS。
+  本次候選待合併：#103 帳務／行情查詢用量及快照一檔。#102 保護單另案，不列為已修復；#57 長時間共存根因仍未證實。
 - RELEASE_NOTES.md 沿用 v0.1.46／v0.1.45 的版本標題、功能段落、驗證範圍與
   結尾風險／下載格式；只寫預計 v0.1.47，不修改 package/Cargo/Tauri 版本。
 
@@ -40,8 +41,9 @@
 
 1. #103 的實際 broker 委託／成交 wire 回歸與原生回報路徑。現有 callback schema
    來自真 1.7.5 OpenAPI，但測試事件仍是合成資料，不能冒充實际 broker 回報。
-2. #108 精確 head 的完整 CI、merge；#103 驗收後 merge，再讓本 release 分支
-   merge 最新 main 並重跑最終候選檢查。每個 PR 一律 merge commit。
+2. #108 已完成精確 head CI 與 merge，本 release 分支已 merge 該 main。
+   #103 驗收後 merge，再讓本 release 分支 merge 最新 main 並重跑最終候選檢查。
+   每個 PR 一律 merge commit。
 3. Fresh native Codex／Claude／Pi 的正式唯讀、proposal deny/expiry、Auto deny/revoke、
    帳戶／環境／runtime lifecycle；成功派送用隔離 broker fixture，不送正式單。
 4. macOS arm64/x64、Windows、Linux 原生 bootstrap／approval／Dashboard，以及

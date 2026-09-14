@@ -4,6 +4,24 @@ Status: release candidate work, not merge/release authorization. No v0.1.46
 onboarding waiver applies. The maintainer explicitly chose production Auto;
 issue #51's original production-Auto prohibition is superseded by that decision.
 
+## Integration status (2026-09-14)
+
+- Private #10 merged as `409c0d1901f4bc81b53e6dd405a0f2615bdd5598`;
+  public #81 merged after repinning and composed CI. The current
+  `DESKTOP_MODULES_REF` equals private main. The maintainer has separately
+  authorized merging ready follow-up PRs, but has not authorized a release tag.
+- Private #10's actual `desktop-ci` passed in public run
+  [34689974496](https://github.com/Sinotrade/shioaji-pro-app/actions/runs/34689974496).
+  Public main `95bff4a` also passed desktop CI in run
+  [34696874122](https://github.com/Sinotrade/shioaji-pro-app/actions/runs/34696874122).
+  These historical results do not replace the final follow-up head's required
+  CI and Linux/Windows composed checks.
+- Public #103 is the usage/market-data follow-up; it does not modify the private
+  runtime. Its native simulation evidence and remaining actual broker-callback
+  validation are tracked in [API usage QA](qa/api-usage.md) and the PR.
+- The next release is planned as v0.1.47. The provider/platform/clean-machine
+  checks below remain open; existing merges do not establish those checks.
+
 ## Evidence
 
 - Official macOS arm64 Shioaji 1.7.5 binary: real Rust anonymous stdin pipe
@@ -38,7 +56,7 @@ approved its frontend fixture scope. This is not approval of the native gates.
 - Native Dashboard origin isolation/CSP behavior remains an explicit real
   WebView gate, not established by the browser fixture.
 
-## Required remaining native gates before merge/release
+## Remaining release gates
 
 1. Fresh native Codex, Claude Code and Pi sessions against the candidate:
    production readonly access, per-order proposal deny/expiry, first Auto
@@ -55,9 +73,11 @@ approved its frontend fixture scope. This is not approval of the native gates.
 4. Private `desktop-ci`, public required CI and Linux/Windows composed tests
    must be green at the pinned immutable private SHA. These are build/test
    gates, separate from the native checks above.
-5. Maintainer approval to merge, private merge commit first, public repin to
-   that merge SHA, rerun composed CI, public merge commit, then separate
-   explicit authorization for a public-main release tag.
+5. Ready follow-up PRs require their own review, QA and exact-head green CI
+   before merge. The original paired integration sequence is complete (above).
+   Any new private change must repeat private merge, public repin and composed
+   CI before public merge. A public-main release tag still requires separate
+   explicit authorization.
 
 ## Safety and cleanup
 

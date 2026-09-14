@@ -21,7 +21,7 @@
 
 ### 正式環境 Agent：確認與 Auto
 
-- 已驗證一次性原生 bootstrap 的正式 sidecar 可供原生 Agent 使用；逐筆確認模式由獨立原生視窗顯示委託與帳戶後核准。
+- 正式 Agent 僅在 sidecar 明確提供一次性原生 bootstrap 能力時啟用；逐筆確認模式由獨立原生視窗顯示委託與帳戶後核准。
 - 使用者可選擇正式 Auto。第一筆會詢問本次 runtime／帳戶授權，後續同範圍下單與刪單依風控自動執行；風控仍可要求逐筆確認。
 - 帳戶或環境切換、停止 Agent、重新載入或重啟會撤銷 Auto。原生端核對呼叫、委託內容與授權範圍，拒絕過期或重複消耗的請求。
 - 正式提案有效 15 秒；核准前後行情變動、報價過期或委託已不可撤時拒絕送出，需依最新狀態重新提案。
@@ -53,15 +53,16 @@
 
 ### 子視窗啟動相容性
 
-- 候選修正 #111：本機 popout、Tray 與原生核可視窗允許 notification plugin 讀取權限狀態，避免初始化的未處理拒絕造成啟動失敗；不增加通知發送、權限詢問或交易權限。已隨 private #11／public #112 合併，剩餘原生驗收持續追蹤 #111。
+- 修正 #111：本機 popout、Tray 與原生核可視窗允許 notification plugin 讀取權限狀態，避免初始化的未處理拒絕造成啟動失敗；不增加通知發送、權限詢問或交易權限。已隨 private #11／public #112 合併，剩餘原生驗收持續追蹤 #111。
 
-### 候選版驗證狀態
+### 驗證狀態與持續追蹤
 
 - 已完成 macOS arm64 真正 1.7.5 pipe bootstrap、唯讀 monitor API smoke，以及原生 Codex 的圖表指標掛載／調整／內容確認移除；另有隔離 fixture 測試，未送出真實委託。
 - macOS arm64 原生 dev App／1.7.5 模擬環境已驗證持倉行情估值、分頁手動更新、初始快照一檔及熱圖兩次冷開；昨餘單位差異由模擬 sidecar 唯讀比對確認。未將這些結果視為正式成交回報或乾淨機器驗收。
 - #103 已依維護者授權先合併完成部分；#85／#86 實際回報、#88／#94 原生異常退出，以及 #75／#57／#102 仍開放，不因合併而視為全部完成。
 - #111 修正後原生 dev · 2773987a 的首個 3374 熱圖小視窗冷開正常、無 fatal；後續再次觀察小視窗正常顯示快照一檔。paired PR 精確 pin 的 CI 已成功並合併；受控重開及其他子視窗驗收仍追蹤 #111。
-- **這份內容先備妥供確認，文件 PR 維持 Draft，尚未發布。** 仍待完成的驗收：原生正式環境登入與 production provider 交易授權流程、四平台實機 approval／Dashboard、乾淨機器安裝，以及實際 broker 回報（wire）重播驗收；回報邊界目前以合成 fixture 覆蓋，不能沿用 v0.1.46 的 QA 豁免。
+- 本版依維護者 2026-09-14 的新授權，先交付 Shioaji 1.7.5。未完成驗收已補齊清單並維持 issue 開啟：正式 Agent 與 Auto 授權 [#51](https://github.com/Sinotrade/shioaji-pro-app/issues/51)、乾淨機器與 provider onboarding [#68](https://github.com/Sinotrade/shioaji-pro-app/issues/68)、四平台原生 bootstrap／approval／Dashboard [#113](https://github.com/Sinotrade/shioaji-pro-app/issues/113)。實際 broker 回報、異常退出與長測仍依上述帳務 issue 追蹤；合成 fixture 和 CI 不代表這些原生驗收已通過。
+- 完整尚未驗證範圍與 issue 索引見 [v0.1.47 驗收記錄](https://github.com/Sinotrade/shioaji-pro-app/blob/v0.1.47/docs/qa/release-v0.1.47.md)。
 - 完整測試、review 與 CI 結果記於 public #81／private #10、public #103／#108，以及 public #112／private #11；尚未驗證範圍見 docs/agent-harness-production-qa.md。
 
 ---

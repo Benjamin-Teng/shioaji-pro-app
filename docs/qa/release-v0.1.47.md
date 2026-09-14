@@ -1,8 +1,11 @@
 # v0.1.47 發布前核對
 
-狀態：發版文章與內容盤點已備妥，尚未達到可打 tag 狀態。維護者已授權合併可驗收的 PR，
-未授權發布，文件 PR 維持 Draft。#103 已依維護者授權先合併完成部分；這不代表剩餘 QA 通過，
-文件 PR 的 CI 也只驗證其實際 checkout。
+狀態：2026-09-14 維護者明確授權發布 v0.1.47，優先讓正式 App 使用 Shioaji 1.7.5。
+本次指示：「先去把這次發佈沒有完整驗過的issue確認好還開著要把完整要驗的內容補充進去
+就先發佈版本吧主要是為了先讓shioaji pro 開始用 1.7.5的shioaji」。
+這是本版新的未完成 QA 延後授權，不沿用 v0.1.46 豁免，也不代表下列原生／wire 驗收通過。
+未完成 issue 已補上案例與完成條件並保持 OPEN；release PR 最新 head 的 CI、review、
+精確 private pin、四平台 release build 與發布產物驗證仍須完成。只由 public main tag 發布。
 
 ## 兩個 repo 的版本範圍
 
@@ -24,7 +27,7 @@
   private #11 已合併為 `a254e739ddfbf43619c90ca76b2cb0078a14ac7d`。
   public #112 repin 此 merge SHA後，head `24df2a6` 四項 CI 成功，
   已合併為 `1d32c6e80bc751d2a12e33db15a2f32988c72d78`。
-  release 分支同步該 main 與精確 pin；仍需剩餘驗收與另行發布授權。
+  release 分支同步該 main 與精確 pin；剩餘原生驗收依本次授權延後，見下方 OPEN issue 清單。
 - RELEASE_NOTES.md 沿用 v0.1.46／v0.1.45 的版本標題、功能段落、驗證範圍與
   結尾風險／下載格式；只寫預計 v0.1.47，不修改 package/Cargo/Tauri 版本。
 
@@ -56,19 +59,35 @@
 - Claude CLI 已實際修正 QA 發現的資訊回應競爭並補回歸；獨立 code-review agent
   與 QA agent 驗收。Mock、實際 sidecar 唯讀與 native UI 證據分開記錄。
 
-## 尚未完成的 gate
+## 授權延後的驗收與 OPEN issues
 
-1. #103 的實際 broker 委託／成交 wire 回歸與原生回報路徑。現有 callback schema
-   來自真 1.7.5 OpenAPI，但測試事件仍是合成資料，不能冒充實际 broker 回報。
-2. #108／#103 與private #11／public #112 已合併；#88／#94原生異常退出及#111
-   受控重開／Tray／approval實際IPC仍待驗收。release分支相對main僅剩發版文件；
-   最終CI以PR最新head完整rollup為準，每個PR一律merge commit。
-3. Fresh native Codex／Claude／Pi 的正式唯讀、proposal deny/expiry、Auto deny/revoke、
-   帳戶／環境／runtime lifecycle；成功派送用隔離 broker fixture，不送正式單。
-4. macOS arm64/x64、Windows、Linux 原生 bootstrap／approval／Dashboard，以及
-   乾淨機器 onboarding。既有 Mac 與 CI 不能代替其他平台或乾淨機器。
-5. 最終 public main 與 private pin 一致、無失敗／取消／pending check；維護者另行
-   明確批准 public main 的 v0.1.47 tag。不得沿用 v0.1.46 的 QA 豁免。
+每張 issue 的「v0.1.47 未完成驗收」均列完整操作／預期與關閉條件。
+實際回報、原生程序與乾淨機器證據不能由 schema fixture 或 CI 取代；不為 QA 送真實委託。
 
-發布時由 tag workflow 建置與上傳；發布後依 docs/RELEASE.md 驗證 18 個 assets、
-11 個 latest.json 平台 key、簽章與 desktop-rev.txt。現在沒有建立任何 tag／release。
+| 未完成範圍 | 持續 OPEN 的 issue |
+| --- | --- |
+| 持倉實際回報、單位、部分成交與 snapshot 邊界 | [#85](https://github.com/Sinotrade/shioaji-pro-app/issues/85)；上游 [#232](https://github.com/Sinotrade/Shioaji/issues/232)、[#233](https://github.com/Sinotrade/Shioaji/issues/233) |
+| 委託實際回報、亂序／重複／重連與未知結果 | [#86](https://github.com/Sinotrade/shioaji-pro-app/issues/86) |
+| 多視窗帳務共用與異常退出 | [#88](https://github.com/Sinotrade/shioaji-pro-app/issues/88) |
+| 行情訂閱 owner、異常退出與孤兒清理 | [#94](https://github.com/Sinotrade/shioaji-pro-app/issues/94) |
+| 整體用量對照與 App／SDK 共存長測 | [#75](https://github.com/Sinotrade/shioaji-pro-app/issues/75)、[#57](https://github.com/Sinotrade/shioaji-pro-app/issues/57) |
+| 保護單另案：實作未納入本版，既有查詢保留 | [#102](https://github.com/Sinotrade/shioaji-pro-app/issues/102) |
+| notification 子視窗修正後完整原生矩陣 | [#111](https://github.com/Sinotrade/shioaji-pro-app/issues/111) |
+| 正式三 provider、confirm／明確選擇 Auto 的授權與撤權 | [#47](https://github.com/Sinotrade/shioaji-pro-app/issues/47)、[#51](https://github.com/Sinotrade/shioaji-pro-app/issues/51) |
+| 乾淨機器與 provider onboarding／復原 | [#68](https://github.com/Sinotrade/shioaji-pro-app/issues/68)、[#56](https://github.com/Sinotrade/shioaji-pro-app/issues/56)、[#69](https://github.com/Sinotrade/shioaji-pro-app/issues/69)、[#70](https://github.com/Sinotrade/shioaji-pro-app/issues/70) |
+| 四平台原生 bootstrap／approval／Dashboard／Debug、安裝與更新 | [#113](https://github.com/Sinotrade/shioaji-pro-app/issues/113) |
+
+證據至少包括 OS／架構、public commit、private 完整 SHA、sidecar／provider runtime 版本、
+安裝來源、操作／預期／實際及未驗範圍；公開附件去識別。成功派送使用隔離 broker fixture，
+實際成交格式來自既有授權回報，不以真實下單製造測試資料。發布後仍維持上述 issue 開啟。
+
+## 仍須完成的發布檢查
+
+1. release PR 的最新 head 經獨立 review，必要 CI、web、Linux/Windows 合成全部 SUCCESS；
+   不忽略失敗、取消或 pending。以 merge commit 合入 main，不修改版本檔。
+2. public main 的 `DESKTOP_MODULES_REF` 為 `a254e739ddfbf43619c90ca76b2cb0078a14ac7d`，
+   與 private main 相同；其真正 desktop-ci 已通過。tag 前再次核對。
+3. public main 的 v0.1.47 tag 觸發四平台 build／簽章／上傳，全部成功後 workflow 才發布。
+4. 發布後依 docs/RELEASE.md 驗證正式標題、非 Draft、18 個 assets、11 個 latest.json
+   平台 key、URL／簽章與 desktop-rev.txt；實際結果寫回 release PR。此文件記錄發布決策，
+   不預先宣稱 tag workflow 或產物驗證已通過。

@@ -1,15 +1,19 @@
 # 1.7.5 / production Agent Harness candidate QA
 
-Status: release candidate work, not merge/release authorization. No v0.1.46
-onboarding waiver applies. The maintainer explicitly chose production Auto;
+Status: on 2026-09-14 the maintainer explicitly authorized v0.1.47 publication
+with unfinished native/wire QA deferred into OPEN issues. This is fresh, version-specific
+authorization, not a claim that QA passed. No v0.1.46 onboarding waiver applies. The maintainer explicitly chose production Auto;
 issue #51's original production-Auto prohibition is superseded by that decision.
 
 ## Integration status (2026-09-14)
 
 - Private #10 merged as `409c0d1901f4bc81b53e6dd405a0f2615bdd5598`;
-  public #81 merged after repinning and composed CI. The current
-  `DESKTOP_MODULES_REF` equals private main. The maintainer has separately
-  authorized merging ready follow-up PRs, but has not authorized a release tag.
+  public #81 merged after repinning and composed CI. Subsequent private #11 /
+  public #112 merged and the current pin is private main
+  `a254e739ddfbf43619c90ca76b2cb0078a14ac7d`. Its actual desktop-ci
+  [34809395865](https://github.com/Sinotrade/shioaji-pro-app/actions/runs/34809395865)
+  passed. v0.1.47 publication is now explicitly authorized; deferred acceptance
+  stays OPEN in #47 / #51 / #68 / #113 (see [release record](qa/release-v0.1.47.md)).
 - Private #10's actual `desktop-ci` passed in public run
   [34689974496](https://github.com/Sinotrade/shioaji-pro-app/actions/runs/34689974496).
   Public main `95bff4a` also passed desktop CI in run
@@ -56,7 +60,7 @@ approved its frontend fixture scope. This is not approval of the native gates.
 - Native Dashboard origin isolation/CSP behavior remains an explicit real
   WebView gate, not established by the browser fixture.
 
-## Remaining release gates
+## Deferred native acceptance and required release checks
 
 1. Fresh native Codex, Claude Code and Pi sessions against the candidate:
    production readonly access, per-order proposal deny/expiry, first Auto
@@ -76,8 +80,9 @@ approved its frontend fixture scope. This is not approval of the native gates.
 5. Ready follow-up PRs require their own review, QA and exact-head green CI
    before merge. The original paired integration sequence is complete (above).
    Any new private change must repeat private merge, public repin and composed
-   CI before public merge. A public-main release tag still requires separate
-   explicit authorization.
+   CI before public merge. The maintainer supplied fresh explicit v0.1.47 release authorization
+   on 2026-09-14; requirements 1–3 remain tracked as unverified in OPEN issues,
+   while the build/review checks in 4–5 remain required before publication.
 
 ## Safety and cleanup
 

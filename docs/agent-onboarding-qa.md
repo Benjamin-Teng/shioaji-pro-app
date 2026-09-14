@@ -12,6 +12,18 @@ evidence, not full cross-platform or clean-machine certification. Keep tracking
 issues open until their remaining acceptance checks pass; compilation, mocked
 UI tests, or runtime version checks alone are insufficient.
 
+## v0.1.47 decision, 2026-09-14
+
+The maintainer explicitly authorized publication to ship Shioaji 1.7.5 after
+recording unfinished acceptance in OPEN issues. This is fresh authorization
+for v0.1.47, not reuse of the v0.1.46 exception or certification of the matrix.
+#68 / #56 / #69 / #70 now include current clean-machine, provider, cancellation,
+recovery and ownership checklists. Native four-platform bootstrap / approval /
+Dashboard acceptance is tracked in [#113](https://github.com/Sinotrade/shioaji-pro-app/issues/113).
+All remain OPEN after release until evidence establishes their acceptance criteria.
+The existing-Mac passes below are historical 2026-09-05 results, not fresh
+v0.1.47 results. See the [release record](qa/release-v0.1.47.md).
+
 ## Acceptance Matrix
 
 | Platform | Runtime | Native login + model + App query |

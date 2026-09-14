@@ -299,7 +299,7 @@ export async function subscribeProductionTradeEvents() {
                 .map((a) => subscribeTradeEvents(a)),
         );
     } catch (error) {
-        notify({ kind: 'err', title: '委託回報訂閱失敗', body: '資料可能過期；請使用「向券商重新確認」重試。' });
+        notify({ kind: 'err', title: '委託回報訂閱失敗', body: '資料可能過期；請使用委託分頁右側的更新圖示重試。' });
         throw error;
     }
 }

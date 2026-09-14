@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { fetchChartHistory, nextChartHistoryRevision } from '../lib/chart-history';
 // src/components/intraday-wall.tsx — 當日走勢牆: a grid of compact
 // intraday (分時) charts driven by a chosen watchlist, with a
@@ -767,6 +768,9 @@ function MiniIntraday({
 
     return (
         <div className={styles.cellChart}>
+            {empty && !loading && <div className={styles.refreshAction}>
+                <RefreshButton label="更新歷史" loading={loading} onClick={() => setReloadSeq(nextChartHistoryRevision())} />
+            </div>}
             <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />
             {loading && (
                 <div className={styles.centerMsg} style={{ position: 'absolute', inset: 0 }}>
@@ -776,7 +780,7 @@ function MiniIntraday({
             {empty && !loading && (
                 <div className={styles.centerMsg} style={{ position: 'absolute', inset: 0 }}>
                     <span className={panel.mono}>無資料</span>
-                <button className={panel.btn} onClick={() => setReloadSeq(nextChartHistoryRevision())}>更新歷史</button></div>
+                </div>
             )}
         </div>
     );

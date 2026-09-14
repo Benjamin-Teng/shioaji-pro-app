@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { useDisplayBook } from '../hooks/use-display-book';
 // src/components/combo-ticket.tsx — 期貨/選擇權組合單（managed 語意，issue #32）
 //
@@ -610,8 +611,10 @@ export function ComboTicket() {
 
     return (
         <div className={styles.body}>
-            <button className={panel.btn} disabled={tradesQuery.loading} onClick={() => void tradesQuery.refresh()}>向券商重新確認組合委託</button>
-            <span role="status">{tradesQuery.error || '組合委託為查詢快照，成交／取消後請手動確認'}</span>
+            <div className={panel.refreshToolbar}>
+                <span role="status">{tradesQuery.error || '組合委託為查詢快照，成交／取消後請手動更新'}</span>
+                <RefreshButton label="更新組合委託" loading={tradesQuery.loading} onClick={() => void tradesQuery.refresh()} />
+            </div>
             <div className={styles.fieldRow}>
                 <button
                     className={styles.iconToggle[sbOpen ? 'on' : 'off']}

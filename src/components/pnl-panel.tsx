@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 // src/components/pnl-panel.tsx — realized P&L analytics (30 days)
 
 import { useCallback } from 'react';
@@ -81,7 +82,10 @@ export function PnlPanel() {
     const { data, error, loading, refresh } = useQuery<PnlRow[]>(
         useCallback(() => fetchPnl(signed), [key]), `pnl-30d:${key}`, signed.length > 0,
     );
-    const controls = <><button className={panel.btn} disabled={loading} onClick={() => void refresh()}>更新已實現損益</button>{error && <span role="status">查詢失敗，保留上次資料：{error}</span>}</>;
+    const controls = <div className={panel.refreshToolbar}>
+        {error && <span role="status">查詢失敗，保留上次資料：{error}</span>}
+        <RefreshButton label="更新已實現損益" loading={loading} disabled={signed.length === 0} onClick={() => void refresh()} />
+    </div>;
     const rows = data ?? [];
     const total = rows.reduce((s, r) => s + r.pnl, 0);
     const wins = rows.filter((r) => r.pnl > 0);
@@ -98,9 +102,9 @@ export function PnlPanel() {
 
     if (rows.length === 0) {
         return (
-            <div className={dock.emptyState}>{controls}
+            <div className={panel.panelBody}>{controls}<div className={dock.emptyState}>
                 {loading ? '載入中…' : error ? '損益資料無法取得' : data ? '近 30 日無已實現損益' : '尚無帳戶資料'}
-            </div>
+            </div></div>
         );
     }
 

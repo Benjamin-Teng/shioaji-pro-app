@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { useLiveSnapshots } from '../hooks/use-live-snapshots';
 // src/components/combo-list.tsx — 交易所組合商品列表（issue #32）
 //
@@ -172,7 +173,6 @@ export function ComboListPanel({
     return (
         <div className={styles.wrap}>
             <div className={styles.toolbar}>
-                <button className={panel.btn} disabled={quotesLoading} onClick={() => void refreshQuotes()}>更新報價</button>
                 {quotesError && <span role="status">{quotesError}；保留上次報價</span>}
                 <select
                     className={styles.select}
@@ -202,6 +202,7 @@ export function ComboListPanel({
                         ))}
                     </optgroup>
                 </select>
+                <RefreshButton label="更新報價" loading={quotesLoading} onClick={() => void refreshQuotes()} />
             </div>
             <div className={styles.toolbar}>
                 {/* 個股期主要入口：搜尋股票代碼/名稱 → 切到其個股期家族

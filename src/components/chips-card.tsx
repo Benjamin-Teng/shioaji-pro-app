@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 // src/components/chips-card.tsx — 個股籌碼卡: margin/short quota, lending
 // sources, regulatory punish flag (stocks only)
 
@@ -69,8 +70,11 @@ export function ChipsCard({ contract }: { contract: ContractInfo }) {
             <div className={dock.emptyState}>籌碼資訊僅支援股票商品</div>
         );
     }
-    const control = <><button className={panel.btn} disabled={loading} onClick={() => void refresh()}>更新籌碼</button>{(error || data?.errors.length) ? <span role="status">{error || data?.errors.join("；")}</span> : null}</>;
-    if (!data) return <div className={dock.emptyState}>{control}{loading ? '載入籌碼資訊…' : '尚無資料'}</div>;
+    const control = <div className={panel.refreshToolbar}>
+        {(error || data?.errors.length) ? <span role="status">{error || data?.errors.join("；")}</span> : null}
+        <RefreshButton label="更新籌碼" loading={loading} onClick={() => void refresh()} />
+    </div>;
+    if (!data) return <div className={panel.panelBody}>{control}<div className={dock.emptyState}>{loading ? '載入籌碼資訊…' : '尚無資料'}</div></div>;
 
     const items: { label: string; value: string; warn?: boolean }[] = [
         {

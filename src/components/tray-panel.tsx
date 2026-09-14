@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 // src/components/tray-panel.tsx — compact menu-bar dropdown panel.
 // Sections are user-configurable (gear): 持倉損益 / 自選清單 / 排行榜.
 // Clicking any symbol focuses the main window and links it everywhere.
@@ -167,13 +168,13 @@ export function TrayPanel() {
     return (
         <div className={styles.wrap}>
             <div className={styles.header}>
-                <button className={panel.btn} disabled={moversPoll.loading} onClick={() => void moversPoll.refresh()}>更新排行</button>
                 <span className={styles.title}>Shioaji Pro</span>
                 <span className={`${styles.headPnl} ${panel.dirText[pnlDir]}`}>
                     {positions.length > 0
                         ? `未實現 ${maskMoney(fmtSigned(Math.round(totalPnl), 0), privMoney)}`
                         : ''}
                 </span>
+                <RefreshButton label="更新排行" loading={moversPoll.loading} onClick={() => void moversPoll.refresh()} />
                 <button
                     className={styles.gearBtn}
                     title='自訂顯示內容'

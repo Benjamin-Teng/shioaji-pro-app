@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveSnapshots } from '../hooks/use-live-snapshots';
@@ -120,7 +121,6 @@ export function WarrantPanel({
     return (
         <div className={styles.wrap}>
             <div className={styles.toolbar}>
-                <button className={panel.btn} disabled={quotesLoading} onClick={() => void refreshQuotes()}>更新報價</button>
                 {quotesError && <span role="status">{quotesError}；保留上次報價</span>}
                 <UnderlyingPicker
                     value={underlying}
@@ -160,6 +160,7 @@ export function WarrantPanel({
                     <option value='moneyness'>價內外排序</option>
                     <option value='expiry'>到期日排序</option>
                 </select>
+                <RefreshButton label="更新報價" loading={quotesLoading} onClick={() => void refreshQuotes()} />
             </div>
             <div className={styles.summary}>
                 <span className={styles.summaryStrong}>

@@ -4,7 +4,7 @@
 // 帳務/交割 tab 在 bottom-dock-account.tsx
 
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshButton } from './refresh-button';
 import {
     ensureAccounts,
     selectAccount,
@@ -267,17 +267,7 @@ export function BottomDock({
                         </button>
                     ))}
                 </span>
-                <button
-                    type='button'
-                    className={styles.refreshButton}
-                    aria-label={`更新${tabLabel}`}
-                    aria-busy={refreshing}
-                    title={refreshing ? '更新中…' : `更新${tabLabel}`}
-                    disabled={refreshing}
-                    onClick={refreshTab}
-                >
-                    <RefreshCw size={14} aria-hidden='true' className={refreshing ? styles.refreshSpinning : undefined} />
-                </button>
+                <RefreshButton label={`更新${tabLabel}`} loading={refreshing} onClick={refreshTab} />
             </div>
             <div className={styles.summaryRow}>
                 <span className={styles.sumItem}>

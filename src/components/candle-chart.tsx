@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { fetchChartHistory, nextChartHistoryRevision } from '../lib/chart-history';
 // src/components/candle-chart.tsx — K-bar candlestick + volume chart
 // (lightweight-charts v5), live-updated from the SSE tick stream.
@@ -1476,7 +1477,6 @@ export function CandleChart({
             onPointerDownCapture={() => { if (panelService && panelId) panelService.focus(panelId); }}
             onFocusCapture={() => { if (panelService && panelId) panelService.focus(panelId); }}>
             <div className={styles.toolbar}>
-                <button className={panel.btn} disabled={loading} onClick={() => setHistorySeq(nextChartHistoryRevision())}>更新歷史</button>
                 {TIMEFRAMES.map((t, i) => (
                     <button
                         key={t.label}
@@ -1569,6 +1569,7 @@ export function CandleChart({
                         onCancel={cancelSettings}
                     />
                 )}
+                <RefreshButton label="更新歷史" loading={loading} onClick={() => setHistorySeq(nextChartHistoryRevision())} />
             </div>
             <div ref={hostRef} className={styles.chartHost}>
                 {loading && (

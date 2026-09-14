@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { useQuery } from '../hooks/use-query';
 // src/components/scanner-panel.tsx — market movers leaderboard
 
@@ -133,7 +134,6 @@ export function ScannerPanel({
     return (
         <>
             <div className={styles.switcher}>
-                <button className={panel.btn} disabled={query.loading} onClick={() => void query.refresh()}>更新排行</button>
                 {MODES.map((m) => (
                     <button
                         key={m.key}
@@ -146,6 +146,7 @@ export function ScannerPanel({
                         {m.label}
                     </button>
                 ))}
+                <RefreshButton label="更新排行" loading={query.loading} onClick={() => void query.refresh()} />
             </div>
             {mode.key === 'multi' && (
                 <div className={styles.filterRow}>

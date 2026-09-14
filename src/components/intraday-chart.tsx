@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { fetchChartHistory, nextChartHistoryRevision } from '../lib/chart-history';
 // src/components/intraday-chart.tsx — 當日走勢圖 (intraday time-price
 // chart): baseline line vs 昨收參考價 with red/green fills, VWAP-style
@@ -1203,7 +1204,6 @@ export function IntradayChart({ contract }: { contract: ContractInfo }) {
 
     return (
         <div className={styles.wrap}>
-            <button className={panel.btn} disabled={loading} onClick={() => setReloadSeq(nextChartHistoryRevision())}>更新歷史</button>
             <div className={styles.legend}>
                 <span className={styles.stats}>
                 {(sessionLabel || staleDate) && (
@@ -1271,6 +1271,7 @@ export function IntradayChart({ contract }: { contract: ContractInfo }) {
                 )}
                 </span>
                 <span className={styles.toggles}>
+                    <RefreshButton label="更新歷史" loading={loading} onClick={() => setReloadSeq(nextChartHistoryRevision())} />
                     <span className={styles.settingsWrap}>
                         <button
                             className={styles.scaleBtn.normal}

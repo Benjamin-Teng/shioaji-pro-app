@@ -1,3 +1,4 @@
+import { RefreshButton } from './refresh-button';
 import { useLiveSnapshots } from '../hooks/use-live-snapshots';
 // src/components/option-chain.tsx — TXO option chain (T 字報價表).
 // Loads the OPT contract list once (cached), shows strikes around ATM for
@@ -177,7 +178,6 @@ export function OptionChain({
 
     return (
         <div className={styles.wrap}>
-                <button className={panel.btn} disabled={quotesLoading} onClick={() => void refreshQuotes()}>更新報價</button>
                 {quotesError && <span role="status">{quotesError}；保留上次報價</span>}
             <div className={styles.toolbar}>
                 {months.map((m) => (
@@ -199,6 +199,7 @@ export function OptionChain({
                             fmtSigned(Number(txf.tick.price_chg), 0)}
                     </span>
                 )}
+                <RefreshButton label="更新報價" loading={quotesLoading} onClick={() => void refreshQuotes()} />
             </div>
             <div className={panel.panelBody}>
                 <table className={styles.table}>

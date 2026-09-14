@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTradingLive } from '../hooks/use-stream';
 import { ensureContract } from '../lib/contracts-cache';
 import { maskMoney, usePrivacyMode, usePrivacyMoney } from '../lib/privacy';
+import { useServerInfo, yesterdayQuantityNotice } from '../lib/server-info-store';
 import {
     notify,
     placeQuickOrder,
@@ -83,6 +84,7 @@ export function PositionsPane({
     const { ref: measureRef, width } = useMeasuredWidth();
     const size = sizeClassOf(width);
     const live = useTradingLive();
+    const yesterdayNotice = yesterdayQuantityNotice(useServerInfo());
     const priv = usePrivacyMode();
     const privMoney = usePrivacyMoney();
     const [armed, setArmed] = useState(false);
@@ -347,9 +349,9 @@ export function PositionsPane({
                                 )}
                             </td>
                             {sz === 'wide' && (
-                                <td className={`${styles.td} ${styles.qtyCell}`}>
+                                <td className={`${styles.td} ${styles.qtyCell}`} title={isStockPosition(p) ? yesterdayNotice : undefined}>
                                     {isStockPosition(p)
-                                        ? maskMoney(
+                                        ? yesterdayNotice ? '待確認' : maskMoney(
                                               fmtStockLots(p.yd_quantity),
                                               privMoney,
                                           )

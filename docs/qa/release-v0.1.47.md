@@ -11,7 +11,7 @@
 
 - 上一版：public v0.1.46；其 release asset desktop-rev.txt 記錄 private
   `a75104e1ff5cd9b63aece09a326d50ee57b10341`。
-- 本轮原先的 private／public pin 基線：`409c0d1901f4bc81b53e6dd405a0f2615bdd5598`。
+- 本輪原先的 private／public pin 基線：`409c0d1901f4bc81b53e6dd405a0f2615bdd5598`。
   private #9／#10 包含圖表指標工具、回測數值基線、1.7.5 bootstrap 與正式 Auto，
   以及 tool permission／內容 approval ID 的修正。private 沒有發版或版本 bump。
 - public 已合併：#79 首頁旗標／主題／文件；#81（含 #77）1.7.5、用量監控、

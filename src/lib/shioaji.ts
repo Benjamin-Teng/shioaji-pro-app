@@ -1,5 +1,6 @@
 import { observeMarketSnapshots } from './market-snapshot-store';
 import { observeTradeResponse } from './trade-observations';
+import { beginServerInfoRequest, observeServerInfo } from './server-info-store';
 // src/lib/shioaji.ts
 
 import { accountFor } from './account-store';
@@ -90,7 +91,16 @@ export function fetchHealth() {
 }
 
 export function fetchInfo() {
-    return apiGet<ServerInfo>('/api/v1/info');
+    // Ordered per API base so a slow or failed earlier call cannot overwrite
+    // a newer response; the caller still gets its own result/error unchanged.
+    const request = beginServerInfoRequest();
+    return apiGet<ServerInfo>('/api/v1/info').then(info => {
+        observeServerInfo(request, info);
+        return info;
+    }, error => {
+        observeServerInfo(request, undefined);
+        throw error;
+    });
 }
 
 export function fetchAccounts() {

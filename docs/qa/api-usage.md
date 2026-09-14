@@ -34,10 +34,10 @@
 
 - 現場 monitoring 唯讀樣本與限制詳見 ADR0002；未觀測到接近每日 bytes 額度，未證明 #57 根因。
 - 獨立 review 和 QA 已覆蓋 order/position projection、query single-flight、失敗保留、snapshot/event race、舊事件、overflow、斷線，以及行情與history scope。以合成 wire fixtures/mock 驗證，不宣稱實際 broker 回報重播或真實下單。
-- 本機 `pnpm build`（含 `tsc -b`）與 `pnpm test` 通過：37 個檔案通過、1 個跳過；285 tests 通過、2 個跳過。既有 build chunk size / ineffective dynamic import 警告仍存在。
+- 本機 `pnpm build`（含 `tsc -b`）與 `pnpm test` 通過。前一輪為 68 個測試檔／571 tests、build PASS；本輪加入 #107 資訊排序回歸後於本 worktree 重跑為 69 個測試檔／575 tests 全數通過、`tsc -b` 無錯誤、`vite build` 通過。既有 build chunk size / ineffective dynamic import 警告仍存在。
 - 隔離 browser QA：Chromium、1360×850、localhost:5191，所有 API/SSE 使用 fixture，代理指向未使用的本機 port。61 秒閒置只初始化 positions/trades 各一次；tick 改變現價與損益不查帳；新增 flash popout 不重查帳；手動 503 保留數據並顯示待對帳。650×850 會被既有桌面 grid 水平裁切，未宣稱窄畫面通過。
 - 1.7.5 schema fixture 擷取自現場 `/openapi.json`，只保存 callback schema，沒有帳號或委託資料。測試的回報內容為依 schema 製作的合成案例；這不等於 DEV.md 所要求的實際 broker wire 回報驗收，盤中去識別回報重播仍待補。
-- 本機疊入 pinned private commit 後，production build 通過、64 個測試檔／548 tests 通過；官方 plugin contract tests 3/3 通過。未啟動 native runtime。
+- 先前疊入 pinned private commit 的隔離檢查：production build 通過、64 個測試檔／548 tests 通過；官方 plugin contract tests 3/3 通過。該輪未啟動 native runtime；最新合成測試數見上方。
 - 公開 CI 與 Linux/Windows 合成檢查結果記錄於 PR 最終 head；尚未成功的檢查不得當作完成。
 - 原生登入、乾淨機器、SDK 與 App 長時間共存的 #57 情境及正式盤中 fill/reconnect 邊界尚未驗收。本次不使用真實下單作測試，無 tag／release。
 
@@ -49,3 +49,24 @@
 - 時間比較使用原始 HTTP snapshot，不使用 watchlist 合成 Tick 後的 datetime；明確空側不從舊快照復活。API base／商品／target alias 隔離，舊 server 晚到回應不寫進新 server 快取。
 - display fallback 不寫入原始 stream。組合到價監控、一般下單確認與 #102 保護單路徑不變。實際 sidecar OpenAPI 確認 snapshot 的 buy_price/buy_volume、sell_price/sell_volume 與 datetime 型別；測試內容仍為合成行情。
 - 獨立 review 已修正 Tick 錯誤淘汰五檔與冷 cache 組合零負價被過濾；QA 已覆蓋 renderer 真實面板 L1／SSE 切換、來源提示與零下單呼叫。原生／CI 最終結果見 PR #103。
+
+## #106 深度熱圖小視窗冷開啟
+
+- 症狀：深度熱圖以小視窗（popout）冷開啟時，canvas 在第一次 layout 未取得高度，畫面留白，需手動調整視窗大小才會繪製。
+- 處置：熱圖容器改為 flex 子項填滿父層、canvas 高度由 flex 決定，不再依賴 `height: 100%` 的祖先鏈；不新增 resize timer 或重查行情。
+- 2026-09-14 原生證據：macOS arm64 dev App／1.7.5 模擬 sidecar，連續兩次冷開啟熱圖小視窗，均不需縮放或調整視窗即完成繪製。由主 agent 實測，獨立 reviewer 檢查 CSS 配置。
+- 此修正僅調整容器與 canvas 的 flex 尺寸，未改資料路徑；原生通過範圍為上述兩次冷開，未宣稱其他平台亦已通過。
+
+## #107 股票持倉昨餘數量單位
+
+- 2026-09-14 實際 sidecar 唯讀比對（已核對 simulation=true、1.7.5，未下單）：同一股票持倉在 Common／Share 兩種單位查詢時 `quantity` 隨單位改變，但 `yd_quantity` 不變；已回報上游 [Sinotrade/Shioaji#233](https://github.com/Sinotrade/Shioaji/issues/233)，單位定義待上游確認。
+- App 處置：持倉表寬版的昨餘欄位依伺服器資訊決定顯示。尚未取得 `/api/v1/info` 時顯示「待確認」；確認為模擬環境且版本精確等於 1.7.5 時同樣顯示「待確認」並以 tooltip 說明；其他版本沿用原顯示。所有數量欄位保留 SDK 原值，不推算張／股，不改動帳務或交易資料。
+- 伺服器資訊來源：只觀測既有的 `fetchInfo` 呼叫（Debug／伺服器面板已在查），不新增 HTTP 請求或 timer。本輪修正「同一 API base 較早發出的 /info 回應（成功或失敗）晚到時覆蓋較新結果」：每次請求取得遞增序號，晚到且序號較舊者丟棄；不同 base 的晚到回應維持隔離；`useSyncExternalStore` 的 subscribe 函式提升為模組層級，避免每次 render 重新訂閱。
+- 本輪測試（合成、無網路、無帳戶）：`src/lib/server-info-store.test.ts` 覆蓋同 base 舊失敗晚到不清除新成功、舊成功晚到不覆蓋新成功、舊成功先到後由新結果接手、切換 base 後舊 base 晚到成功／失敗均不進入新 base 且切回時仍為原先套用值；`src/lib/shioaji-fetch-info.test.ts` 以 mock fetch 驗證 `fetchInfo` 呼叫者仍各自取得原本結果／錯誤，晚到 503 不覆蓋較新成功，切換 base 後舊回應不寫入新 base。移除排序判斷後上述 3 個案例確實失敗（mutant 檢查）。
+- 未驗證：這些測試為 React test renderer 與 mock fetch 的合成案例，不等於真 App 原生登入、切換伺服器或正式盤中行為；#107 單位定義仍待上游回覆。
+
+## 2026-09-14 盤中原生面板驗收
+
+- macOS arm64 既有 dev App 連接 1.7.5 模擬 sidecar：主視窗持倉現價／損益隨 Tick 變動；穩定閒置觀測未出現持倉或一般委託的週期重查。手動更新持倉／委託／帳務只觸發對應分頁查詢。
+- 原生五檔與閃電下單已觀測首次快照一檔，BidAsk 接手；選擇權、個股期、權證、組合列表與圖表行情正常。SSE LIVE 與新 heartbeat 已確認。未啟用閃電或進行正式下單。
+- 本輪還覆蓋 #106 熱圖冷開及 #107 昨餘提示。精確本機監控、帳號與帳務數據不放入公開證據；原生結果未涵蓋正式 fill/reconnect、異常退出或全新安裝。

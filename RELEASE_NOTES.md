@@ -51,12 +51,18 @@
 
 - 桌面合成測試改由 PR 觸發，main push 與手動執行保留；concurrency 依事件與 PR 編號隔離，避免同一 commit 的 push 與 PR 兩輪互相取消在 PR 留下紅叉（#84）。交付前須核對最新 head 的完整 check rollup。
 
+### 子視窗啟動相容性
+
+- 候選修正 #111：本機 popout、Tray 與原生核可視窗允許 notification plugin 讀取權限狀態，避免初始化的未處理拒絕造成啟動失敗；不增加通知發送、權限詢問或交易權限。private #11／public #112 尚待 paired merge 與最終驗收。
+
 ### 候選版驗證狀態
 
 - 已完成 macOS arm64 真正 1.7.5 pipe bootstrap、唯讀 monitor API smoke，以及原生 Codex 的圖表指標掛載／調整／內容確認移除；另有隔離 fixture 測試，未送出真實委託。
 - macOS arm64 原生 dev App／1.7.5 模擬環境已驗證持倉行情估值、分頁手動更新、初始快照一檔及熱圖兩次冷開；昨餘單位差異由模擬 sidecar 唯讀比對確認。未將這些結果視為正式成交回報或乾淨機器驗收。
-- **這份內容先備妥供確認，尚未發布。** 仍待完成的驗收：原生正式環境登入與 production provider 交易授權流程、四平台實機 approval／Dashboard、乾淨機器安裝，以及實際 broker 回報（wire）重播驗收；回報邊界目前以合成 fixture 覆蓋，不能沿用 v0.1.46 的 QA 豁免。
-- 完整測試、review 與 CI 結果記於 public #81／private #10 及 public #103；尚未驗證範圍見 docs/agent-harness-production-qa.md。
+- #103 已依維護者授權先合併完成部分；#85／#86 實際回報、#88／#94 原生異常退出，以及 #75／#57／#102 仍開放，不因合併而視為全部完成。
+- #111 修正後原生 dev · 2773987a 的首個 3374 熱圖小視窗冷開正常、無 fatal；第二次測試未完成，paired PR 最終 CI／合併與其他子視窗驗收仍待補。
+- **這份內容先備妥供確認，文件 PR 維持 Draft，尚未發布。** 仍待完成的驗收：原生正式環境登入與 production provider 交易授權流程、四平台實機 approval／Dashboard、乾淨機器安裝，以及實際 broker 回報（wire）重播驗收；回報邊界目前以合成 fixture 覆蓋，不能沿用 v0.1.46 的 QA 豁免。
+- 完整測試、review 與 CI 結果記於 public #81／private #10、public #103／#108，以及候選 public #112／private #11；尚未驗證範圍見 docs/agent-harness-production-qa.md。
 
 ---
 

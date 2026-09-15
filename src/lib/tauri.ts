@@ -11,6 +11,7 @@ import {
     EXPECTED_SERVER_VERSION,
     LEGACY_PORT,
     getApiBase,
+    getDevServerPort,
     getApiPort,
     getApiScheme,
     getServerPid,
@@ -270,6 +271,7 @@ async function spawnServerViaChannels(
 // Ports a shioaji server could be answering on: whatever the app last used,
 // the app default, and the CLI default (a user-run `shioaji server` daemon).
 function candidatePorts(): number[] {
+    if (getDevServerPort()) return [getDevServerPort()!];
     return [...new Set([getApiPort(), DEFAULT_PORT, LEGACY_PORT])];
 }
 
@@ -428,6 +430,7 @@ export async function serverStatus(): Promise<ServerStatus | null> {
                     : undefined,
         };
     }
+    if (getDevServerPort()) return { running: false };
     try {
         const res = await sidecar(['server', 'status', '--format', 'json']);
         const jsonStart = res.output.indexOf('{');
@@ -650,7 +653,7 @@ export async function serverStart(opts: {
     // reload landing in that window used to see "not running", then the
     // pre-spawn reclaim killed the warming child by remembered pid — the
     // restart loop. Wait for the remembered spawn to surface instead.
-    if (!st?.running && getServerPid() && getSpawnPort()) {
+    if (!st?.running && getServerPid() && getSpawnPort() && (!getDevServerPort() || getSpawnPort() === getDevServerPort())) {
         const spawnPort = getSpawnPort()!;
         const deadline = Date.now() + 20_000;
         while (Date.now() < deadline) {
@@ -671,7 +674,7 @@ export async function serverStart(opts: {
             await new Promise((r) => setTimeout(r, 1500));
         }
     }
-    if (!st?.running) {
+    if (!st?.running && !getDevServerPort()) {
         // an orphan of ours can sit on a fallback port with its record lost
         // (cleared web storage) — sweep the find_free_port windows (current
         // default + the pre-21322 legacy one) before piling yet another
@@ -807,14 +810,15 @@ export async function serverStart(opts: {
     }
 
     // preferred port occupied by something else → first free port after it
-    let port = DEFAULT_PORT;
+    const preferredPort = getDevServerPort() ?? DEFAULT_PORT;
+    let port = preferredPort;
     try {
         const { invoke } = await import('@tauri-apps/api/core');
         // nothing usable is answering, so any listener still bound on our
         // ports is a zombie orphan (SIGKILLed app → dead pipe → HTTP dead) —
         // reclaim our own before picking a port; foreign listeners refuse
         // the ownership check and find_free_port dodges them below
-        for (const p of new Set([getApiPort(), DEFAULT_PORT])) {
+        for (const p of new Set(getDevServerPort() ? [preferredPort] : [getApiPort(), DEFAULT_PORT])) {
             await invoke('kill_shioaji', {
                 port: p,
                 pid: getServerPid(),
@@ -822,8 +826,11 @@ export async function serverStart(opts: {
         }
         setServerPid(null);
         const free = await invoke<number>('find_free_port', {
-            preferred: DEFAULT_PORT,
+            preferred: preferredPort,
         });
+        if (getDevServerPort() && free !== preferredPort) {
+            return { ok: false, output: '隔離測試連接埠已被占用；不切換至其他伺服器', port: preferredPort, attached: false, portChanged: false };
+        }
         if (free > 0) port = free;
     } catch {
         // command unavailable — try the default and let the server error

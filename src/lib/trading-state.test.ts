@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeOrderEvent, type OrderEventReport } from './order-report';
 import schema from './fixtures/order-callback-openapi-1.7.5.json';
 import type { TradeObservation } from './trade-observations';
+import type { Account } from './types/portfolio';
 
 const mocks = vi.hoisted(() => ({
+    extraAccounts: [] as Account[],
     status: 'live', order: null as ((r: OrderEventReport) => void) | null,
     statusChanged: null as (() => void) | null,
     response: null as ((value: TradeObservation) => void) | null,
@@ -13,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     positions: vi.fn(), trades: vi.fn(), balance: vi.fn(), margin: vi.fn(), subscribe: vi.fn(),
     account: { account_type: 'S', broker_id: 'fixture', account_id: 'a', person_id: 'fixture', signed: true, username: 'fixture' },
 }));
-vi.mock('./account-store', () => ({ useAccounts: () => ({ accounts: [mocks.account], selectedStock: mocks.account, selectedFutures: null }), getAccountState: () => ({ accounts: [mocks.account] }), refreshAccounts: vi.fn() }));
+vi.mock('./account-store', () => ({ useAccounts: () => ({ accounts: [mocks.account, ...mocks.extraAccounts], selectedStock: mocks.account, selectedFutures: null }), getAccountState: () => ({ accounts: [mocks.account, ...mocks.extraAccounts] }), refreshAccounts: vi.fn() }));
 vi.mock('./runtime', () => ({ getApiBase: () => 'http://fixture.invalid' }));
 vi.mock('./boot', () => ({ subscribeProductionTradeEvents: mocks.subscribe }));
 vi.mock('./trade-observations', () => ({ onTradeResponse: (cb: typeof mocks.response) => { mocks.response = cb; return vi.fn(); } }));
@@ -47,8 +49,10 @@ async function flush() { await act(async () => { await Promise.resolve(); }); }
 async function emit(report: OrderEventReport) { await act(async () => { mocks.order!(report); vi.advanceTimersByTime(50); }); }
 beforeEach(async () => {
     vi.resetModules(); vi.clearAllMocks(); vi.useFakeTimers(); vi.setSystemTime(epoch * 1000);
+    vi.stubGlobal('navigator', { locks: { request: (_name: string, _options: unknown, callback: (lock: object) => unknown) => callback({}) } });
     vi.stubGlobal('BroadcastChannel', undefined); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     mocks.status = 'live'; mocks.order = null; mocks.statusChanged = null; mocks.response = null; mocks.account.account_type = 'S';
+    mocks.extraAccounts = [];
     mocks.positions.mockReset().mockImplementation(async () => [baseline()]);
     mocks.trades.mockReset().mockResolvedValue([]); mocks.balance.mockReset().mockResolvedValue({ acc_balance: 100, date: '2026-09-12', errmsg: '' });
     mocks.subscribe.mockReset().mockResolvedValue(undefined);
@@ -61,6 +65,30 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => { root?.unmount(); }); root = undefined; vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('shared trading state with isolated broker fixtures', () => {
+    it('reads funds for every signed account and preserves only the failed account snapshot', async () => {
+        mocks.extraAccounts = [{ ...mocks.account, account_id: 'b' }, { ...mocks.account, account_id: 'f', account_type: 'F' }];
+        mocks.balance.mockImplementation(async (a: Account) => ({ acc_balance: a.account_id === 'b' ? 200 : 100, date: '2026-09-15', errmsg: '' }));
+        mocks.margin.mockResolvedValue({ equity: 300 });
+        vi.advanceTimersByTime(1500);
+        await act(async () => { await store.refreshTradingState('account'); });
+        const before = store.getTradingState().funds!;
+        expect(before.map(f => f.account.account_id)).toEqual(['a', 'b', 'f']);
+        expect(before.map(f => f.balance?.acc_balance ?? f.margin?.equity)).toEqual([100, 200, 300]);
+        const queries = [mocks.positions.mock.calls.length, mocks.trades.mock.calls.length];
+        mocks.balance.mockImplementation(async (a: Account) => ({ acc_balance: a.account_id === 'b' ? 0 : 110, date: '2026-09-15', errmsg: a.account_id === 'b' ? 'upstream error' : '' }));
+        vi.advanceTimersByTime(1500);
+        await act(async () => { await store.refreshTradingState('account'); });
+        const after = store.getTradingState().funds!;
+        expect(after[0]!.balance!.acc_balance).toBe(110);
+        expect(after[1]!.balance!.acc_balance).toBe(200);
+        expect(after[1]!.error).toBeTruthy();
+        expect(after[1]!.updatedAt).toBe(before[1]!.updatedAt);
+        expect(store.getTradingState().queries.account.needsReconcile).toBe(true);
+        expect([mocks.positions.mock.calls.length, mocks.trades.mock.calls.length]).toEqual(queries);
+        const calls = mocks.balance.mock.calls.length;
+        vi.advanceTimersByTime(60000);
+        expect(mocks.balance.mock.calls.length).toBe(calls);
+    });
     it('marks both orders and positions stale for a futures deal arriving before order metadata', async () => {
         mocks.account.account_type = 'F';
         mocks.positions.mockResolvedValueOnce([]); mocks.margin.mockResolvedValue({ equity: 100 });
@@ -264,4 +292,65 @@ describe('shared trading state with isolated broker fixtures', () => {
         expect(store.getTradingState().error).toContain('串流曾中斷');
         expect(mocks.trades).toHaveBeenCalledTimes(2);
     });
+});
+
+it('applies a confirmed cancellation response without SSE or accounting queries', async () => {
+    await emit(order());
+    const old = store.getTradingState().trades[0]!;
+    const counts = [mocks.trades.mock.calls.length, mocks.positions.mock.calls.length, mocks.balance.mock.calls.length];
+    const { observeTradeMutation } = await import('./trade-mutations');
+    await act(async () => {
+        await observeTradeMutation(old.order.id, async () => ({ ...old, status: { ...old.status, status: 'Cancelled', cancel_quantity: 3 } }));
+        vi.advanceTimersByTime(50);
+    });
+    expect(store.getTradingState().trades[0]!.status.status).toBe('Cancelled');
+    expect([mocks.trades.mock.calls.length, mocks.positions.mock.calls.length, mocks.balance.mock.calls.length]).toEqual(counts);
+});
+it('preserves newer SSE when a late cancellation response arrives', async () => {
+    await emit(order()); const old = store.getTradingState().trades[0]!;
+    const { observeTradeMutation } = await import('./trade-mutations');
+    const delayed = deferred<typeof old>();
+    const request = observeTradeMutation(old.order.id, () => delayed.promise);
+    await emit(deal());
+    const newer = store.getTradingState().trades[0]!;
+    await act(async () => { delayed.resolve({ ...old, status: { ...old.status, status: 'Cancelled', cancel_quantity: 3 } }); await request; });
+    expect(store.getTradingState().trades[0]).toBe(newer);
+    expect(store.getTradingState().queries.orders.needsReconcile).toBe(true);
+});
+it('rejects a mismatched account response for display and does not query automatically', async () => {
+    await emit(order()); const old = store.getTradingState().trades[0]!;
+    const { observeTradeMutation } = await import('./trade-mutations');
+    await act(async () => { await observeTradeMutation(old.order.id, async () => ({ ...old,
+        order: { ...old.order, account: { ...mocks.account, account_id: 'other' } },
+        status: { ...old.status, status: 'Cancelled', cancel_quantity: 3 } })); });
+    expect(store.getTradingState().trades[0]).toBe(old);
+    expect(store.getTradingState().queries.orders.needsReconcile).toBe(true);
+});
+it('marks positions stale when cancellation HTTP reports a fill missing from SSE', async () => {
+    await emit(order()); const old = store.getTradingState().trades[0]!;
+    const positions = store.getTradingState().positions;
+    const { observeTradeMutation } = await import('./trade-mutations');
+    await act(async () => { await observeTradeMutation(old.order.id, async () => ({ ...old,
+        status: { ...old.status, status: 'Cancelled', deal_quantity: 1, cancel_quantity: 2 } })); });
+    expect(store.getTradingState().trades[0]!.status.deal_quantity).toBe(1);
+    expect(store.getTradingState().positions).toBe(positions);
+    expect(store.getTradingState().queries.positions.needsReconcile).toBe(true);
+    expect(store.getTradingState().queries.positions.error).toContain('新增成交');
+});
+it('replays sanitized native New with empty full_code after matching PendingSubmit HTTP metadata', async () => {
+    const fixture = (await import('./fixtures/native-simulation-order-1.7.5.json')).default;
+    mocks.account.account_type = 'F'; mocks.account.account_id = 'fixture'; mocks.account.broker_id = 'fixture';
+    const report = normalizeOrderEvent(fixture[0])!;
+    await emit(report);
+    expect(store.getTradingState().trades).toHaveLength(0);
+    const body = fixture[0]!.data.FuturesOrder;
+    const response = { contract: {code:body.contract.code,security_type:'FUT',exchange:'TAIFEX',target_code:null},
+        order: {...body.order, account:mocks.account, octype:body.order.oc_type},
+        status: {id:body.order.id,status:'PendingSubmit',status_code:'',msg:'',order_quantity:body.order.quantity,
+            deal_quantity:0,cancel_quantity:0,modified_price:0,deals:[]} } as import('./types/order').Trade;
+    await act(async () => { mocks.response!({trade:response,account:mocks.account}); });
+    expect(store.getTradingState().trades[0]!.status.status).toBe('Submitted');
+    expect(store.getTradingState().trades[0]!.contract.code).toBe(body.contract.code);
+    // Restore mutable fixture identity for the existing suite's next test.
+    mocks.account.account_id='a'; mocks.account.broker_id='fixture';
 });

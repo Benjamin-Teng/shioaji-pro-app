@@ -47,7 +47,7 @@ export function positionFill(report: OrderEventReport, accounts: Account[], trad
     if (type === 'S' && condition !== 'Cash') return null;
     if (type === 'F' && !['New', 'Cover', 'Auto'].includes(openClose)) return null;
     const code = trade?.contract.target_code || trade?.contract.code || text(body.full_code) || report.code;
-    if (type === 'F' && text(body.full_code) && text(body.full_code) !== code) return null;
+    if (type === 'F' && (text(body.full_code) || text(body.code)) !== code) return null;
     if (!code || !report.tradeId) return null;
     return {
         key: `${type}:${account.broker_id}:${account.account_id}:${Math.floor(report.ts / 86400)}:${text(body.exchange_seq)}:${report.tradeId}`,

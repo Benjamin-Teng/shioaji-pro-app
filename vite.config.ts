@@ -26,6 +26,14 @@ const pkg = JSON.parse(
 
 export default defineConfig(({ mode, command }) => {
     const env = loadEnv(mode, process.cwd(), '');
+    const devPort = command === 'serve' ? env.VITE_DEV_SERVER_PORT : undefined;
+    const isolatedApi = devPort ? `http://127.0.0.1:${Number(devPort)}` : undefined;
+    if (devPort && (!Number.isInteger(Number(devPort)) || Number(devPort) < 1024 || Number(devPort) > 65535)) {
+        throw new Error('VITE_DEV_SERVER_PORT 必須是 1024–65535');
+    }
+    if (isolatedApi && env.VITE_API_TARGET && env.VITE_API_TARGET !== isolatedApi) {
+        throw new Error('隔離 dev 服務與 VITE_API_TARGET 不一致，拒絕啟動');
+    }
     let revision: string | undefined;
     let dirty = false;
     try {
@@ -135,7 +143,7 @@ export default defineConfig(({ mode, command }) => {
                 // dev 打自帶 sidecar（scripts/dev-api.sh，與 CI 打包同版
                 // binary、port 21322）— 確保 API/UI 版本相符，不依賴使用
                 // 者自裝在 8080 的 CLI。要打別台時用 VITE_API_TARGET 蓋掉
-                '/api': env.VITE_API_TARGET ?? 'http://127.0.0.1:21322',
+                '/api': env.VITE_API_TARGET ?? isolatedApi ?? 'http://127.0.0.1:21322',
             },
         },
     };

@@ -69,7 +69,8 @@ import {
 } from '../lib/trigger-engine';
 import type { ContractBase } from '../lib/types/contract';
 import type { Candle } from '../lib/types/market';
-import { ACTIVE_ORDER_STATUSES, type Trade } from '../lib/types/order';
+import type { Trade } from '../lib/types/order';
+import { remainingWorkingOrderQuantity } from '../lib/working-order-quantity';
 import { fmtPrice } from '../lib/utils/format';
 import {
     aggregate,
@@ -217,7 +218,7 @@ export function CandleChart({
                     (t.contract.code === contract.code ||
                         (contract.target_code &&
                             t.contract.code === contract.target_code)) &&
-                    ACTIVE_ORDER_STATUSES.has(t.status.status),
+                    remainingWorkingOrderQuantity(t) > 0,
             ),
         [trades, contract],
     );
@@ -1080,7 +1081,7 @@ export function CandleChart({
         workingOrders.map((t) => [
             t.order.id,
             t.status.modified_price || t.order.price,
-            t.order.quantity - t.status.deal_quantity,
+            remainingWorkingOrderQuantity(t),
         ]),
     );
     useEffect(() => {
@@ -1089,7 +1090,7 @@ export function CandleChart({
         const lines = new Map<string, IPriceLine>();
         for (const t of workingOrdersRef.current) {
             const price = t.status.modified_price || t.order.price;
-            const remaining = t.order.quantity - t.status.deal_quantity;
+            const remaining = remainingWorkingOrderQuantity(t);
             lines.set(
                 t.order.id,
                 series.createPriceLine({
@@ -1604,8 +1605,7 @@ export function CandleChart({
                         {workingOrders.map((t) => {
                             const price =
                                 t.status.modified_price || t.order.price;
-                            const remaining =
-                                t.order.quantity - t.status.deal_quantity;
+                            const remaining = remainingWorkingOrderQuantity(t);
                             return (
                                 <div
                                     key={t.order.id}

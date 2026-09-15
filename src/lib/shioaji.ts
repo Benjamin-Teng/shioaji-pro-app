@@ -1,9 +1,12 @@
+import { getApiBase } from './runtime';
+import { remainingWorkingOrderQuantity } from './working-order-quantity';
+import { observeTradeMutation } from './trade-mutations';
 import { observeMarketSnapshots } from './market-snapshot-store';
 import { observeTradeResponse } from './trade-observations';
 import { beginServerInfoRequest, observeServerInfo } from './server-info-store';
 // src/lib/shioaji.ts
 
-import { accountFor } from './account-store';
+import { accountFor, getAccountState } from './account-store';
 import { apiDelete, apiGet, apiPost, apiPut } from './api';
 import {
     registerCapabilitySubscription,
@@ -783,29 +786,96 @@ export function placeFuturesOrder(
     }, opts).then(ensureAccepted).then(trade => observeTradeResponse(trade, selected));
 }
 
+/** Temporary workaround: https://github.com/Sinotrade/Shioaji/issues/235
+ * Remove after upstream cache hydration is fixed and native futures change/cancel
+ * succeeds without update_status. Explicit preflight only; no polling or retry.
+ */
+async function prepareOrderMutation(tradeId: string): Promise<string> {
+    const base = getApiBase();
+    const refuse = (message: string): never => { throw Object.assign(new Error(message), { mutationNotStarted: true }); };
+    const { getTradingState } = await import('./trading-state');
+    if (base !== getApiBase()) refuse('伺服器已切換，未送出改刪單');
+    const matches = getTradingState().trades.filter(t => t.order.id === tradeId);
+    if (matches.length !== 1) refuse('委託或帳戶歸屬不明，請先手動更新委託；未送出改刪單');
+    const trade = matches[0]!;
+    if (trade.account && trade.order.account && (['account_type', 'broker_id', 'account_id'] as const).some(
+        key => trade.account![key] !== trade.order.account![key])) refuse('委託帳戶資料矛盾，未送出改刪單');
+    const reference = trade.account ?? trade.order.account;
+    const account = getAccountState().accounts.find(a => a.signed && reference
+        && a.account_type === reference.account_type && a.broker_id === reference.broker_id && a.account_id === reference.account_id);
+    if (!account) refuse('缺少已驗證的委託帳戶，未送出改刪單');
+    const futures = ['FUT', 'OPT'].includes(trade.contract.security_type ?? '');
+    if (account!.account_type !== (futures ? 'F' : 'S')) refuse('商品與委託帳戶不符，未送出改刪單');
+    if (!futures) return base; // Stock mutations retain their existing zero-query path.
+    let rows: Trade[];
+    try { rows = await fetchTrades('F', account!); }
+    catch (error) {
+        throw Object.assign(error instanceof Error ? error : new Error(String(error)), { mutationNotStarted: true });
+    }
+    if (base !== getApiBase()) refuse('對帳期間伺服器已切換，未送出改刪單');
+    const current = rows.filter(t => t.order.id === tradeId
+        && t.order.account?.account_type === account!.account_type
+        && t.order.account?.broker_id === account!.broker_id
+        && t.order.account?.account_id === account!.account_id);
+    const latest = getTradingState().trades.filter(t => t.order.id === tradeId);
+    const agreesWithKnownIdentifiers = (candidate: Trade, known: Trade) =>
+        (['seqno', 'ordno'] as const).every(key => !known.order[key]?.trim() || candidate.order[key] === known.order[key]);
+    const sameAmounts = (candidate: Trade) => candidate.order.quantity === trade.order.quantity
+        && candidate.status.deal_quantity === trade.status.deal_quantity
+        && candidate.status.cancel_quantity === trade.status.cancel_quantity;
+    if (!getAccountState().accounts.some(a => a.signed && a.account_type === account!.account_type
+        && a.broker_id === account!.broker_id && a.account_id === account!.account_id)
+        || latest.length !== 1 || !agreesWithKnownIdentifiers(latest[0]!, trade)
+        || (latest[0]!.account ?? latest[0]!.order.account)?.account_type !== account!.account_type
+        || (latest[0]!.account && latest[0]!.order.account && (['account_type', 'broker_id', 'account_id'] as const).some(
+            key => latest[0]!.account![key] !== latest[0]!.order.account![key]))
+        || latest[0]!.order.action !== trade.order.action
+        || (latest[0]!.contract.target_code || latest[0]!.contract.code) !== (trade.contract.target_code || trade.contract.code)
+        || !sameAmounts(latest[0]!) || remainingWorkingOrderQuantity(latest[0]!) <= 0
+        || (latest[0]!.account ?? latest[0]!.order.account)?.account_id !== account!.account_id
+        || (latest[0]!.account ?? latest[0]!.order.account)?.broker_id !== account!.broker_id) refuse('對帳期間委託或帳戶已變更，請重新確認；未送出改刪單');
+    if (current.length !== 1 || !agreesWithKnownIdentifiers(current[0]!, trade)
+        || !agreesWithKnownIdentifiers(current[0]!, latest[0]!) || !sameAmounts(current[0]!) || remainingWorkingOrderQuantity(current[0]!) <= 0
+        || current[0]!.order.action !== trade.order.action
+        || !current[0]!.order.seqno?.trim() || !current[0]!.order.ordno?.trim()
+        || (current[0]!.contract.target_code || current[0]!.contract.code) !== (trade.contract.target_code || trade.contract.code)) {
+        refuse('期貨對帳未找到可操作且識別完整的同筆委託，未送出改刪單');
+    }
+    return base;
+}
+
 export function cancelOrder(
     tradeId: string,
     opts?: { agentInitiated?: boolean; agentCallId?: string; agentAuto?: boolean },
 ) {
-    return apiPost<Trade>(
+    return observeTradeMutation(tradeId, async () => {
+        const base = await prepareOrderMutation(tradeId);
+        if (base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
+        return apiPost<Trade>(
         '/api/v1/order/cancel_order',
         { trade_id: tradeId },
         opts,
-    );
+    ); });
 }
 
 export function updateOrderPrice(tradeId: string, price: number) {
-    return apiPost<Trade>('/api/v1/order/update_price', {
+    return observeTradeMutation(tradeId, async () => {
+        const base = await prepareOrderMutation(tradeId);
+        if (base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
+        return apiPost<Trade>('/api/v1/order/update_price', {
         trade_id: tradeId,
         price,
-    });
+    }); });
 }
 
 export function updateOrderQty(tradeId: string, quantity: number) {
-    return apiPost<Trade>('/api/v1/order/update_qty', {
+    return observeTradeMutation(tradeId, async () => {
+        const base = await prepareOrderMutation(tradeId);
+        if (base !== getApiBase()) throw Object.assign(new Error('伺服器已切換，未送出改刪單'), { mutationNotStarted: true });
+        return apiPost<Trade>('/api/v1/order/update_qty', {
         trade_id: tradeId,
         quantity,
-    });
+    }); });
 }
 
 // explicit account selector — omitted falls back to the store's selected

@@ -1,3 +1,4 @@
+import { onTradeMutation } from './trade-mutations';
 import { useEffect, useSyncExternalStore } from 'react';
 import { getAccountState, refreshAccounts, useAccounts } from './account-store';
 import { ensureContract, getCachedContract } from './contracts-cache';
@@ -10,7 +11,7 @@ import { ensureStream, getStreamStatus, onAnyTick, onOrderEvent, subscribeStatus
 import { applyPositionFill, markPosition, positionFill, reportBody } from './portfolio-projection';
 import { projectOrderReport, projectTradeDeal } from './order-projection';
 import type { OrderEventReport } from './order-report';
-import type { AccountBalance, AccountedPosition, Margin } from './types/portfolio';
+import type { AccountBalance, AccountedPosition, AccountFunds, Margin } from './types/portfolio';
 import type { AccountedTrade } from './types/order';
 
 export type TradingQueryScope = 'positions' | 'orders' | 'account';
@@ -21,6 +22,7 @@ export interface TradingState {
     queries: Record<TradingQueryScope, TradingQueryStatus>;
     positions: AccountedPosition[];
     trades: AccountedTrade[];
+    funds?: AccountFunds[];
     balance?: AccountBalance;
     margin?: Margin;
     balanceAccount?: string;
@@ -66,6 +68,7 @@ const seenFills = new Set<string>();
 const pendingDeals = new Map<string, OrderEventReport>();
 const pendingContracts = new Set<string>();
 const orderTimes = new Map<string, number>();
+const pendingOrders = new Map<string, OrderEventReport>();
 let queryEvents: OrderEventReport[] | null = null;
 let queryOverflow = false;
 let connectionEpoch = 0;
@@ -141,16 +144,27 @@ export function refreshTradingState(scope: TradingQueryScope | 'all' = 'all'): P
                 } catch { errors.orders.push(`${account.account_type} 委託查詢失敗，保留上次資料`); }
             }
             if (readAccount) {
+                const funds: AccountFunds[] = [];
+                for (const account of accounts) {
+                    const previous = state.funds?.find(f => accountKey(f.account) === accountKey(account));
+                    try {
+                        const value = account.account_type === 'S'
+                            ? { balance: await fetchAccountBalance(account) }
+                            : { margin: await fetchMargin(account) };
+                        if (value.balance?.errmsg?.trim()) throw new Error('券商餘額查詢回報錯誤');
+                        funds.push({ account, ...value, updatedAt: Date.now() });
+                    } catch {
+                        const error = `${account.account_type === 'S' ? '餘額' : '保證金'}查詢失敗，保留此帳戶上次資料`;
+                        funds.push({ ...previous, account, error });
+                        errors.account.push(error);
+                    }
+                }
                 const stock = getAccountState().selectedStock ?? accounts.find(a => a.account_type === 'S');
                 const future = getAccountState().selectedFutures ?? accounts.find(a => a.account_type === 'F');
-                if (stock) {
-                    try { state = { ...state, balance: await fetchAccountBalance(stock), balanceAccount: accountKey(stock) }; }
-                    catch { errors.account.push('餘額查詢失敗，保留上次資料'); }
-                }
-                if (future) {
-                    try { state = { ...state, margin: await fetchMargin(future), marginAccount: accountKey(future) }; }
-                    catch { errors.account.push('保證金查詢失敗，保留上次資料'); }
-                }
+                state = { ...state, funds,
+                    balance: funds.find(f => stock && accountKey(f.account) === accountKey(stock))?.balance,
+                    margin: funds.find(f => future && accountKey(f.account) === accountKey(future))?.margin,
+                    balanceAccount: stock && accountKey(stock), marginAccount: future && accountKey(future) };
             }
             if (readPositions) prepareQuotes();
         } catch (e) { for (const key of targets) errors[key].push(e instanceof Error ? e.message : String(e)); }
@@ -214,6 +228,34 @@ function start() {
     if (started) return;
     started = true;
     if (isMirror) { channel?.postMessage({ kind: 'request' }); return; }
+    const mutationBaselines = new Map<string, { trade: AccountedTrade | undefined; sequence: number }>();
+    const stopMutations = onTradeMutation(event => {
+        if (event.phase === 'begin') {
+            const matches = state.trades.filter(t => t.order.id === event.tradeId);
+            if (mutationBaselines.size >= 500) mutationBaselines.delete(mutationBaselines.keys().next().value!);
+            mutationBaselines.set(event.token, { trade: matches.length === 1 ? matches[0] : undefined, sequence: eventSequence });
+            return;
+        }
+        const baseline = mutationBaselines.get(event.token);
+        const old = baseline?.trade;
+        mutationBaselines.delete(event.token);
+        const trade = event.trade;
+        const account = trade?.order?.account;
+        // Preserve every newer SSE/snapshot result. Never insert an unknown or
+        // ambiguously scoped response, nor turn an old working state into finality.
+        const sameAccount = old?.account && account && accountKey(old.account) === accountKey(account);
+        if (old && baseline?.sequence === eventSequence && state.trades.includes(old) && sameAccount && trade?.order.id === event.tradeId
+            && ['Cancelled', 'Filled'].includes(trade.status.status)
+            && trade.status.deal_quantity >= old.status.deal_quantity
+            && trade.status.cancel_quantity >= old.status.cancel_quantity) {
+            if (trade.status.deal_quantity > old.status.deal_quantity) markStale('positions', '刪單／改單回應包含新增成交；持倉尚待回報或手動對帳');
+            state = { ...state, trades: state.trades.map(t => t === old ? { ...trade, account: old.account } : t) };
+        } else {
+            markStale('orders', '刪單／改單結果待確認；請手動更新委託，不要自動重送');
+        }
+        if (queryEvents) queryOverflow = true;
+        schedulePublish();
+    });
     const stopResponses = onTradeResponse(({ trade, account: requestedAccount }) => {
         const ref = trade.order.account ?? requestedAccount;
         const account = getAccountState().accounts.find(a => a.signed && a.account_type === ref?.account_type
@@ -228,6 +270,25 @@ function start() {
                 price_type: t.order.price_type || trade.order.price_type,
                 order_type: t.order.order_type || trade.order.order_type } }) };
         } else state = { ...state, trades: [...state.trades, { ...trade, account }] };
+        // A native New event can omit full_code before the HTTP response has
+        // supplied canonical metadata. Replay only the same account/id and code.
+        const pendingKey = `${account.account_type === 'S' ? 'stock' : 'futures'}:${account.broker_id}:${account.account_id}:${trade.order.id}`;
+        const pendingOrder = pendingOrders.get(pendingKey);
+        if (pendingOrder && pendingOrder.kind === 'order' && !old
+            && ['PendingSubmit', 'PreSubmitted'].includes(trade.status.status)
+            && (!pendingOrder.ts || pendingOrder.ts >= (orderTimes.get(pendingKey) ?? 0))) {
+            const body = reportBody(pendingOrder);
+            const eventContract = body?.contract as { code?: string; full_code?: string } | undefined;
+            const canonical = trade.contract.target_code || trade.contract.code;
+            if ((eventContract?.full_code || eventContract?.code) === canonical) {
+                const projected = projectOrderReport(state.trades, pendingOrder, getAccountState().accounts);
+                if (projected) {
+                    state = { ...state, trades: projected };
+                    if (pendingOrder.ts) orderTimes.set(pendingKey, pendingOrder.ts);
+                    pendingOrders.delete(pendingKey);
+                }
+            }
+        }
         // Do not allow an in-flight snapshot to overwrite a response that was
         // received afterwards; the user can explicitly reconcile once settled.
         if (queryEvents) queryOverflow = true;
@@ -257,7 +318,14 @@ function start() {
                 for (const [key2, deal] of [...pendingDeals]) {
                     if (deal.kind === 'deal' && deal.tradeId === report.id) { pendingDeals.delete(key2); applyDeal(deal); }
                 }
-            } else markStale('orders', '回報已收到；委託快照待手動對帳');
+            } else {
+                const previous = pendingOrders.get(key);
+                if (report.opType === 'New' && (!previous?.ts || (report.ts ?? 0) >= previous.ts)) {
+                    if (pendingOrders.size >= 500 && !pendingOrders.has(key)) pendingOrders.delete(pendingOrders.keys().next().value!);
+                    pendingOrders.set(key, report);
+                }
+                markStale('orders', '回報已收到；委託快照待手動對帳');
+            }
         }
         schedulePublish();
     });
@@ -286,7 +354,7 @@ function start() {
     };
     const stopStatus = subscribeStatusStore(statusChanged);
     import.meta.hot?.dispose(() => {
-        stopResponses(); stopOrders(); stopTicks(); stopStatus(); channel?.close();
+        stopMutations(); stopResponses(); stopOrders(); stopTicks(); stopStatus(); channel?.close();
         positionQuotes.forEach(entry => entry.release?.());
         if (publishTimer) clearTimeout(publishTimer);
     });
@@ -303,7 +371,7 @@ export function useTradingState() {
     const accounts = useAccounts();
     const current = useSyncExternalStore(subscribeTradingState, getTradingState);
     return { ...current,
-        balance: accounts.selectedStock && current.balanceAccount === accountKey(accounts.selectedStock) ? current.balance : undefined,
-        margin: accounts.selectedFutures && current.marginAccount === accountKey(accounts.selectedFutures) ? current.margin : undefined,
+        balance: current.funds?.find(f => accounts.selectedStock && accountKey(f.account) === accountKey(accounts.selectedStock))?.balance,
+        margin: current.funds?.find(f => accounts.selectedFutures && accountKey(f.account) === accountKey(accounts.selectedFutures))?.margin,
     };
 }

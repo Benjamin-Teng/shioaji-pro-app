@@ -1,3 +1,4 @@
+import { remainingWorkingOrderQuantity } from '../lib/working-order-quantity';
 // src/components/bottom-dock.tsx — positions / orders / account tabs.
 // 標題列常駐：帳戶範圍選單、合併｜分帳戶切換、市場篩選 chips、摘要列；
 // 持倉/委託表本體在 bottom-dock-positions.tsx / bottom-dock-orders.tsx、
@@ -29,7 +30,6 @@ import { AccountPane, type AccountRefreshControls } from './bottom-dock-account'
 import { OrdersPane } from './bottom-dock-orders';
 import { PositionsPane } from './bottom-dock-positions';
 import {
-    ACTIVE_STATUSES,
     accountToRef,
     isStockPosition,
     positionAccountRef,
@@ -65,6 +65,10 @@ export function BottomDock({
     const [tab, setTab] = useState<TabKey>('positions');
     const [accountRefresh, setAccountRefresh] = useState<AccountRefreshControls | null>(null);
     const queryStatus = portfolio.queries[tab];
+    // 操作通知已呈現改刪單結果；不在委託表重複常駐通用提示。
+    const queryError = tab === 'orders'
+        && queryStatus.error === '刪單／改單結果待確認；請手動更新委託，不要自動重送'
+        ? null : queryStatus.error;
     const refreshing = portfolio.loading || (tab === 'account' && !!accountRefresh?.loading);
     const tabLabel = { positions: '持倉', orders: '委託', account: '帳務' }[tab];
     const refreshTab = () => {
@@ -117,7 +121,7 @@ export function BottomDock({
         return true;
     });
     const activeOrders = scopedTrades.filter((t) =>
-        ACTIVE_STATUSES.has(t.status.status),
+        remainingWorkingOrderQuantity(t) > 0,
     ).length;
 
     const tabs: { key: TabKey; label: string }[] = [
@@ -318,7 +322,7 @@ export function BottomDock({
                     </span>
                 )}
             </div>
-            {queryStatus.error && <div role="status" style={{ padding: '4px 10px', fontSize: 12 }}>{queryStatus.error}</div>}
+            {queryError && <div role="status" style={{ padding: '4px 10px', fontSize: 12 }}>{queryError}</div>}
             {tab === 'positions' && (
                 <PositionsPane
                     positions={positions}
@@ -348,6 +352,8 @@ export function BottomDock({
             {tab === 'account' && (
                 <div className={panel.panelBody}>
                     <AccountPane
+                        mode={mode}
+                        funds={portfolio.funds}
                         // 股票市值估算要跟摘要列一樣尊重帳戶範圍 — 多帳戶時
                         // 選單一帳戶不能把別的帳戶持倉算進來
                         positions={

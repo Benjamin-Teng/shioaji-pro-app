@@ -32,16 +32,41 @@ export function projectOrderReport(rows: AccountedTrade[], report: OrderEventRep
     if (!code || (old && (old.contract.target_code || old.contract.code) !== code)) return null;
     if (report.failed && report.opType !== 'New') return rows; // rejected cancel/change must not erase a working order
     if (!old && report.opType !== 'New') return null;
-    const quantity = report.orderQuantity || old?.status.order_quantity || report.quantity;
+    // Callback status.order_quantity can be the reduced quantity (UpdateQty),
+    // while HTTP Trade stores the original quantity alongside cumulative cancels.
+    // Keep that Trade invariant; never subtract cancelled quantity twice.
+    const quantity = old?.order.quantity ?? report.quantity;
+    // Formal futures UpdateQty/Cancel reports can carry a smaller quantity
+    // than the original order. Keep the original Trade quantity and reconcile
+    // the operation with status quantities below.
+    const futuresOperationQuantity = report.market === 'futures'
+        && ['UpdateQty', 'Cancel'].includes(report.opType)
+        && report.quantity > 0 && report.quantity <= quantity;
+    if (old && report.quantity !== quantity && !futuresOperationQuantity) return null;
     const deals = old?.status.deal_quantity ?? 0;
-    const cancelled = Math.max(old?.status.cancel_quantity ?? 0, report.cancelQuantity);
+    if (old && ['Cancelled', 'Filled'].includes(old.status.status)) return rows;
+    let cancelled = old?.status.cancel_quantity ?? 0;
+    if (report.opType === 'UpdateQty') {
+        // Native 1.7.5 reports cancel_quantity as this operation's reduction.
+        // With no fills, its post-reduction order_quantity gives an idempotent
+        // absolute total. Its meaning after fills is not yet wire-verified.
+        if (deals > 0 || !num(rec(body?.status)?.order_quantity) || report.orderQuantity > quantity) return null;
+        const absoluteCancelled = quantity - report.orderQuantity;
+        if (absoluteCancelled < cancelled || report.cancelQuantity > absoluteCancelled) return null;
+        cancelled = absoluteCancelled;
+    } else if (report.opType === 'Cancel') {
+        // Only confirm when known fills and this cancellation account for the
+        // whole original order; missing reports require manual reconciliation.
+        cancelled += report.cancelQuantity;
+        if (cancelled + deals !== quantity) return null;
+    }
     if (!quantity || deals + cancelled > quantity) return null;
     const next: AccountedTrade = {
         account,
         contract: { code, security_type: contract.security_type as 'STK' | 'FUT' | 'OPT' | 'WRT',
             exchange: contract.exchange as 'TSE' | 'OTC' | 'OES' | 'TAIFEX', target_code: null },
         order: { ...old?.order, id: report.id, seqno: report.seqno, ordno: report.ordno,
-            action: report.action as 'Buy' | 'Sell', price: report.price, quantity: report.quantity,
+            action: report.action as 'Buy' | 'Sell', price: report.price, quantity,
             order_lot: report.orderLot, octype: report.ocType, account,
             ...(['LMT', 'MKT', 'MKP'].includes(report.priceType) ? { price_type: report.priceType } : {}),
             ...(['ROD', 'IOC', 'FOK'].includes(report.orderType) ? { order_type: report.orderType as 'ROD' | 'IOC' | 'FOK' } : {}),
@@ -63,7 +88,7 @@ export function projectTradeDeal(rows: AccountedTrade[], report: OrderEventRepor
     const old = rows.find(t => t.order.id === report.tradeId && t.account?.account_id === body?.account_id
         && t.account?.broker_id === body?.broker_id && t.account?.account_type === (report.market === 'stock' ? 'S' : 'F'));
     if (!old) return null;
-    const code = report.market === 'futures' ? body?.full_code : body?.code;
+    const code = report.market === 'futures' ? (body?.full_code || body?.code) : body?.code;
     if (code !== (old.contract.target_code || old.contract.code)) return null;
     if (old.status.deals.some(d => d.seq === seq)) return rows;
     const quantity = old.status.deal_quantity + report.quantity;

@@ -134,6 +134,19 @@ test coverage 門檻、quality metrics 等。落地時更新本節。
 
 ## 每次開發交付：備妥可試用的 dev App
 
+- 同機已有正式 sidecar 時，隔離 dev App 設定 `VITE_DEV_SERVER_PORT=21323`。
+  此設定只在 development 生效，將原生服務管理、REST 與直接 SSE 鎖定到指定埠；
+  不可因 `21323` 停機或占用而探測、接手或啟動到 `21322`、`8080` 或其他 fallback 埠。
+  舊 localStorage 的正式服務埠／PID 不能成為隔離 dev 的操作目標。
+- `VITE_API_BASE` 通常不另設；若設定，必須與隔離服務的 scheme、`127.0.0.1`
+  及 `21323` 完全一致，矛盾設定會拒絕連線。自訂 Vite port 時，SSE 使用
+  `VITE_STREAM_BASE` 指向目前 Vite 的同來源 origin，並將 `VITE_API_TARGET`
+  設為 `http://127.0.0.1:21323`（HTTPS 服務則使用相符 scheme），讓 `/api` proxy
+  指向同一隔離 sidecar。不可把 SSE override 指向正式 `21322`；同源 proxy 的
+  target 亦須人工核對，不能只看到 REST 正常便宣稱隔離或 SSE LIVE 通過。
+- 隔離啟動前後分別確認 dev 與正式 App／sidecar 的 PID、port、模式和新 heartbeat；
+  僅清理由本次任務建立的程序。原生管理與 SSE 的實測證據、mock 探測測試分開記錄。
+
 - 每次完成功能或修正，都要把 dev App 更新到本次工作分支，實際開啟並
   驗證可操作後再交付；只有 PR、CI 或隔離 browser fixture 不算完成 dev 交付。
 - 純前端變更沿用相容的原生 dev shell，切換其 Vite 到本次 worktree；
